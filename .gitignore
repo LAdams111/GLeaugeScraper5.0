@@ -70,6 +70,14 @@ web_modules/
 .env.*
 !.env.example
 
+# Scraper runtime artifacts
+scrape-gleague-backfill.checkpoint.json
+scrape-gleague-backfill.log
+gleague-player-slugs.cache.json
+gleague-teams.cache.json
+bref-gleague-to-bdl.cache.json
+bref-to-bdl.cache.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
