@@ -48,6 +48,14 @@ export function getCachedTeam(
   return cache.teams[cacheKey(abbrev, seasonYear)] ?? null;
 }
 
+/** Any cached season for this abbreviation (avoids extra BRef team page fetches). */
+export function getCachedTeamByAbbrev(cache: TeamCache, abbrev: string): TeamCacheEntry | null {
+  const upper = abbrev.toUpperCase();
+  const matches = Object.values(cache.teams).filter((entry) => entry.abbrev === upper);
+  if (matches.length === 0) return null;
+  return matches.sort((a, b) => b.seasonYear - a.seasonYear)[0];
+}
+
 export function setCachedTeam(
   cache: TeamCache,
   abbrev: string,

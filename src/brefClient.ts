@@ -18,6 +18,12 @@ export function uncommentBrefHtml(html: string): string {
   return html.replace(/<!--\s*\n/g, "").replace(/\n\s*-->/g, "");
 }
 
+/** BRef sometimes returns HTTP 200 with an empty body when rate limited. */
+export function isBlockedBrefHtml(html: string): boolean {
+  if (html.length < 500) return true;
+  return !/<title>/i.test(html);
+}
+
 export class BrefClient {
   private lastRequestAt = 0;
   private cooldownUntil = 0;
@@ -29,7 +35,7 @@ export class BrefClient {
   ) {}
 
   private effectiveDelay(minDelayMs: number): number {
-    return minDelayMs + this.penaltyDelayMs + jitterMs(1500);
+    return minDelayMs + this.penaltyDelayMs + jitterMs(2500);
   }
 
   private decayPenalty(): void {
@@ -52,13 +58,16 @@ export class BrefClient {
     this.lastRequestAt = Date.now();
   }
 
-  private async applyRateLimitCooldown(response: Response, attempt: number): Promise<void> {
-    const retryAfterMs = parseRetryAfterMs(response.headers.get("Retry-After"));
-    const waitMs = retryAfterMs ?? backoffMs(attempt);
+  private async applyRateLimitCooldown(response: Response | null, attempt: number): Promise<void> {
+    const retryAfterMs = response
+      ? parseRetryAfterMs(response.headers.get("Retry-After"))
+      : null;
+    const waitMs = retryAfterMs ?? backoffMs(attempt, 8000);
     this.cooldownUntil = Date.now() + waitMs;
-    this.penaltyDelayMs = Math.min(15_000, this.penaltyDelayMs + 3000);
+    this.penaltyDelayMs = Math.min(20_000, this.penaltyDelayMs + 4000);
+    const status = response?.status ?? "blocked";
     console.error(
-      `[bref] rate limited (${response.status}), waiting ${Math.round(waitMs / 1000)}s ` +
+      `[bref] rate limited (${status}), waiting ${Math.round(waitMs / 1000)}s ` +
         `(penalty delay now +${this.penaltyDelayMs}ms)...`,
     );
     await sleep(waitMs);
@@ -102,8 +111,20 @@ export class BrefClient {
         throw new BrefClientError(`BRef fetch failed (${response.status}): ${url}`);
       }
 
+      const html = await response.text();
+      if (isBlockedBrefHtml(html)) {
+        if (attempt < retries) {
+          console.error(
+            `[bref] empty/blocked response (${html.length} bytes) for ${url}, retrying...`,
+          );
+          await this.applyRateLimitCooldown(null, attempt);
+          continue;
+        }
+        throw new BrefRateLimitError(`BRef blocked or empty response: ${url}`);
+      }
+
       this.decayPenalty();
-      return await response.text();
+      return html;
     }
 
     throw new BrefClientError(`Failed to fetch ${url}`);

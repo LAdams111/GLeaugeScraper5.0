@@ -30,13 +30,13 @@ export interface AppConfig {
 }
 
 /** Default delay between BRef player page fetches (single-player / testing). */
-export const DEFAULT_PLAYER_DELAY_MS = 6000;
+export const DEFAULT_PLAYER_DELAY_MS = 8000;
 
-/** Conservative backfill pacing. */
-export const BACKFILL_PLAYER_DELAY_MS = 6000;
+/** Conservative backfill pacing — slower to avoid BRef 429 blocks. */
+export const BACKFILL_PLAYER_DELAY_MS = 10_000;
 
 /** Delay between A–Z index letter pages during backfill. */
-export const BACKFILL_INDEX_DELAY_MS = 10_000;
+export const BACKFILL_INDEX_DELAY_MS = 12_000;
 
 export function loadConfig(): AppConfig {
   const hoopCentralApiUrl = normalizeBaseUrl(
